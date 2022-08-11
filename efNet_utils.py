@@ -2,7 +2,7 @@
    These helper functions are built to mirror those in the official TensorFlow implementation.
 """
 """
-Utility for efficientnet
+Utility for efficientnet 08/11
 """
 # Author: lukemelas (github username)
 # Github repo: https://github.com/lukemelas/EfficientNet-PyTorch
