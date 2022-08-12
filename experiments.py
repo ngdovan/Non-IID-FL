@@ -215,7 +215,7 @@ def train_net(net_id, net, train_dataloader, test_dataloader, epochs, lr, args_o
 
     logger.info('>> Training accuracy: %f' % train_acc)
     logger.info('>> Test accuracy: %f' % test_acc)
-
+    
 
     logger.info(' ** Training complete **')
     return train_acc, test_acc
@@ -916,7 +916,7 @@ if __name__ == '__main__':
 
             logger.info('>> Global Model Train accuracy: %f' % train_acc)
             logger.info('>> Global Model Test accuracy: %f' % test_acc)
-
+            print("Global accuracy: ", train_acc)
 
     elif args.alg == 'fedprox':
         logger.info("Initializing nets")
