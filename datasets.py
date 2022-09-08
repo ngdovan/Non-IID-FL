@@ -1,3 +1,4 @@
+from turtle import down
 import torch.utils.data as data
 import torch
 from PIL import Image
@@ -16,6 +17,10 @@ import os
 import os.path
 import logging
 import torchvision.datasets.utils as utils
+
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 logging.basicConfig()
 logger = logging.getLogger()
@@ -55,6 +60,40 @@ def default_loader(path):
 class CustomTensorDataset(data.TensorDataset):
     def __getitem__(self, index):
         return tuple(tensor[index] for tensor in self.tensors) + (index,)
+
+
+class IrisCustom(MNIST):
+
+    def __init__(self, root, dataidxs=None, train=True, transform=None, target_transform=None,
+                 download=False):
+        super(MNIST, self).__init__(root, transform=transform,
+                                    target_transform=target_transform)
+        self.train = train
+        self.dataidxs = dataidxs
+        
+        iris = load_iris()
+        X = iris['data']
+        y = iris['target']
+
+        # Scale data to have mean 0 and variance 1 
+        # which is importance for convergence of the neural network
+        scaler = StandardScaler()
+        X_scaled = torch.from_numpy(scaler.fit_transform(X)).float()
+    
+
+        self.data, self.targets = (X_scaled,y)
+
+        if self.dataidxs is not None:
+            self.data = self.data[self.dataidxs]
+            self.targets = self.targets[self.dataidxs]        
+
+
+    def __getitem__(self, index):
+        data, target = self.data[index], self.targets[index]
+        return data, target
+
+    def __len__(self):
+        return len(self.data)
 
 
 class MNIST_truncated(data.Dataset):
@@ -627,13 +666,13 @@ class FEMNIST(MNIST):
                                     target_transform=target_transform)
         self.train = train
         self.dataidxs = dataidxs
-
+        #download = False
         if download:
             self.download()
-
-        if not self._check_exists():
-            raise RuntimeError('Dataset not found.' +
-                               ' You can use download=True to download it')
+        #print(os.path.join(self.processed_folder, self.training_file))
+        #if not self._check_exists():
+        #    raise RuntimeError('Dataset not found.' +
+        #                       ' You can use download=True to download it')
         if self.train:
             data_file = self.training_file
         else:
@@ -672,8 +711,10 @@ class FEMNIST(MNIST):
 
         # process and save as torch files
         print('Processing...')
-        shutil.move(os.path.join(self.raw_folder, self.training_file), self.processed_folder)
-        shutil.move(os.path.join(self.raw_folder, self.test_file), self.processed_folder)
+        #shutil.move(os.path.join(self.raw_folder, self.training_file), self.processed_folder)
+        #shutil.move(os.path.join(self.raw_folder, self.test_file), self.processed_folder)
+        shutil.copy(os.path.join(self.raw_folder, self.training_file), self.processed_folder)
+        shutil.copy(os.path.join(self.raw_folder, self.test_file), self.processed_folder)
 
     def __len__(self):
         return len(self.data)
