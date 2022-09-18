@@ -1,4 +1,4 @@
-for alg in fedprox scaffold fednova
+for alg in fedavg fedprox fednova
 do
     python experiments.py --model=simple-cnn \
         --dataset=cifar10 \
@@ -10,7 +10,7 @@ do
         --mu=0.01 \
         --rho=0.9 \
         --comm_round=100 \
-        --partition=noniid-labeldir \
+        --partition=cluster \
         --beta=0.5\
         --device='cuda:0'\
         --datadir='./data/' \

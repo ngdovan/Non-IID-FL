@@ -36,7 +36,12 @@ def kl_mvn(m0, S0, m1, S1):
 
     # kl is made of three terms
     tr_term   = np.trace(iS1 @ S0)
-    det_term  = np.log(np.linalg.det(S1)/np.linalg.det(S0)) #np.sum(np.log(S1)) - np.sum(np.log(S0))
+    #use np.linalg.slogdet instead of np.linalg.det (used in original code) for large matrix
+
+    sign_S1, log_S1 = np.linalg.slogdet(S1)
+    sign_S0, log_S0 = np.linalg.slogdet(S0)
+
+    det_term  = sign_S1*log_S1 - sign_S0*log_S0 #np.sum(np.log(S1)) - np.sum(np.log(S0))
     quad_term = diff.T @ np.linalg.inv(S1) @ diff #np.sum( (diff*diff) * iS1, axis=1)
     #print(tr_term,det_term,quad_term)
     return .5 * (tr_term + det_term + quad_term - N) 
@@ -70,7 +75,6 @@ def distance_to_aggregator(parties):
     
     avg_mean = sum(means)/party_num
     avg_cov = sum(covs)/party_num
-    
     kl_distance = [kl_mvn(means[i],covs[i],avg_mean,avg_cov) for i in range(party_num) ]
     
     return kl_distance

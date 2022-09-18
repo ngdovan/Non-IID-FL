@@ -23,6 +23,9 @@ from utils import *
 from vggmodel import *
 from resnetcifar import *
 from fedprob_utils import fit_mv_normal, distance_to_global
+from img_to_vec import Img2Vec
+from PIL import Image
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -849,10 +852,14 @@ def local_train_net_fedprob(nets, selected, global_model, args, net_dataidx_map,
         cache_list = list(iter(train_dl_local))
         assert len(cache_list) > 0
         #assert index < len(cache_list[0])
-        x_list = np.array(list(map(lambda x: x[0].numpy(), cache_list)))
+        x_list = np.array(list(map(lambda x: x[0].numpy(), cache_list)), dtype = object)
         #print(result_list)
         train_x = x_list[0]
+        
+        if args.dataset == 'cifar10':
+            train_x = train_x.reshape(len(train_x),3072)
         mu_i, cov_i = fit_mv_normal(train_x)
+        
         #for x in x_list:
 
         #result_list = np.array(list(map(lambda x: x[1].numpy(), cache_list)))
@@ -969,7 +976,28 @@ if __name__ == '__main__':
     logger.info("Partitioning data")
     X_train, y_train, X_test, y_test, net_dataidx_map, traindata_cls_counts = partition_data(
         args.dataset, args.datadir, args.logdir, args.partition, args.n_parties, beta=args.beta)
-
+    #print(X_train.shape)
+    #print(len(X_train[0]))
+    #print(X_train.transpose(3,1,2))
+    #print(X_train.reshape(len(X_train), 3072)[0])
+    #print(net_dataidx_map)
+    #pil_image = Image.fromarray(numpy_image)
+    #print("Getting encode ...")
+    #samples = len(X_train)
+    #img2vec = Img2Vec()
+    #vec_length = 512  # Using resnet-18 as default
+    #vec_mat = np.zeros((samples, vec_length))
+    
+    #k_value = 2  # How many clusters
+    #for i in range(len(X_train)):
+    #for i in range(2):
+    #    img = Image.fromarray(X_train[i]).convert('RGB')
+    #    #img.show()
+    #    vec = img2vec.get_vec(img)
+    #    vec_mat[i, :] = vec
+    #    print(vec)
+    #import sys
+    #sys.exit()
     n_classes = len(np.unique(y_train))
 
     train_dl_global, test_dl_global, train_ds_global, test_ds_global = get_dataloader(args.dataset,
@@ -1339,7 +1367,6 @@ if __name__ == '__main__':
             assert party_num == len(selected)
             d = distance_to_global(prob_list)
             
-            
             eps = .1
             max_d = max(d)
             s = [max_d*(eps + 1) - distance + eps for distance in d]
@@ -1356,10 +1383,10 @@ if __name__ == '__main__':
                 net_para = nets[selected[idx]].cpu().state_dict()
                 if idx == 0:
                     for key in net_para:
-                        global_para[key] = net_para[key] * party_weight [idx] * fed_avg_freqs[idx] 
+                        global_para[key] = net_para[key] * party_weight [idx] #* fed_avg_freqs[idx] 
                 else:
                     for key in net_para:
-                        global_para[key] += net_para[key] * party_weight [idx] * fed_avg_freqs[idx] 
+                        global_para[key] += net_para[key] * party_weight [idx] #* fed_avg_freqs[idx] 
             global_model.load_state_dict(global_para)
 
             logger.info('global n_training: %d' % len(train_dl_global))

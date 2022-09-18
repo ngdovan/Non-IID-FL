@@ -28,7 +28,7 @@ import sklearn.datasets as sk
 from sklearn.datasets import load_svmlight_file, load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-
+from sklearn.cluster import KMeans
 
 logging.basicConfig()
 logger = logging.getLogger()
@@ -325,6 +325,18 @@ def partition_data(dataset, datadir, logdir, partition, n_parties, beta=0.4):
         idxs = np.random.permutation(n_train)
         batch_idxs = np.array_split(idxs, n_parties)
         net_dataidx_map = {i: batch_idxs[i] for i in range(n_parties)}
+
+    elif partition == "cluster":
+        kmeans = KMeans(n_clusters = n_parties, init = 'k-means++', max_iter = 300, n_init = 10, random_state = 0)
+        tmp_x = X_train
+        if dataset == 'cifar10':
+            tmp_x = tmp_x.reshape(len(tmp_x),3072)
+        kmeans.fit(tmp_x)
+        p_kmeans = kmeans.predict(tmp_x)
+        batch_idxs = [[] for _ in range(n_parties)]
+        for i in range(n_train):
+            batch_idxs[p_kmeans[i]].append(i) 
+        net_dataidx_map = {i: np.array(batch_idxs[i]) for i in range(n_parties)}
 
 
     elif partition == "noniid-labeldir":
