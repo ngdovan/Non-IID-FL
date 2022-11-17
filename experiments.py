@@ -856,7 +856,7 @@ def local_train_net_fedprob(nets, selected, global_model, args, net_dataidx_map,
         #print(result_list)
         train_x = x_list[0]
         
-        if args.dataset == 'cifar10':
+        if args.dataset in {'cifar10','svhn'}:
             train_x = train_x.reshape(len(train_x),3072)
         mu_i, cov_i = fit_mv_normal(train_x)
         
