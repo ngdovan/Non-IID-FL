@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 import copy
 
 from model import *
-from datasets import MNIST_truncated, CIFAR10_truncated, CIFAR100_truncated, ImageFolder_custom, SVHN_custom, FashionMNIST_truncated, CustomTensorDataset, CelebA_custom, FEMNIST, Generated, genData
+from datasets import IrisCustom, MNIST_truncated, CIFAR10_truncated, CIFAR100_truncated, ImageFolder_custom, SVHN_custom, FashionMNIST_truncated, CustomTensorDataset, CelebA_custom, FEMNIST, Generated, genData
 from math import sqrt
 
 import torch.nn as nn
@@ -25,7 +25,10 @@ import random
 from models.mnist_model import Generator, Discriminator, DHead, QHead
 from config import params
 import sklearn.datasets as sk
-from sklearn.datasets import load_svmlight_file
+from sklearn.datasets import load_svmlight_file, load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
 
 logging.basicConfig()
 logger = logging.getLogger()
@@ -36,6 +39,28 @@ def mkdirs(dirpath):
         os.makedirs(dirpath)
     except Exception as _:
         pass
+
+def load_iris_data(datadir):
+    
+    iris = load_iris()
+    X = iris['data']
+    y = iris['target']
+
+    # Scale data to have mean 0 and variance 1 
+    # which is importance for convergence of the neural network
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Split the data set into training and testing
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_scaled, y, test_size=0.2, random_state=2)
+
+    #X_train = torch.from_numpy(X_train).float() # convert to tensors
+    #y_train = torch.from_numpy(y_train).float()
+    #X_test = torch.from_numpy(X_test).float()
+    #y_test = torch.from_numpy(y_test).float()
+    
+    return (X_train, y_train, X_test, y_test)
 
 def load_mnist_data(datadir):
 
@@ -182,6 +207,8 @@ def partition_data(dataset, datadir, logdir, partition, n_parties, beta=0.4):
 
     if dataset == 'mnist':
         X_train, y_train, X_test, y_test = load_mnist_data(datadir)
+    elif dataset == 'iris':
+        X_train, y_train, X_test, y_test = load_iris_data(datadir)
     elif dataset == 'fmnist':
         X_train, y_train, X_test, y_test = load_fmnist_data(datadir)
     elif dataset == 'cifar10':
@@ -298,6 +325,18 @@ def partition_data(dataset, datadir, logdir, partition, n_parties, beta=0.4):
         idxs = np.random.permutation(n_train)
         batch_idxs = np.array_split(idxs, n_parties)
         net_dataidx_map = {i: batch_idxs[i] for i in range(n_parties)}
+
+    elif partition == "cluster":
+        kmeans = KMeans(n_clusters = n_parties, init = 'k-means++', max_iter = 300, n_init = 10, random_state = 0)
+        tmp_x = X_train
+        if dataset == 'cifar10':
+            tmp_x = tmp_x.reshape(len(tmp_x),3072)
+        kmeans.fit(tmp_x)
+        p_kmeans = kmeans.predict(tmp_x)
+        batch_idxs = [[] for _ in range(n_parties)]
+        for i in range(n_train):
+            batch_idxs[p_kmeans[i]].append(i) 
+        net_dataidx_map = {i: np.array(batch_idxs[i]) for i in range(n_parties)}
 
 
     elif partition == "noniid-labeldir":
@@ -665,9 +704,20 @@ class AddGaussianNoise(object):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, noise_level=0, net_id=None, total=0):
-    if dataset in ('mnist', 'femnist', 'fmnist', 'cifar10', 'svhn', 'generated', 'covtype', 'a9a', 'rcv1', 'SUSY', 'cifar100', 'tinyimagenet'):
+    if dataset in ('mnist', 'iris',  'femnist', 'fmnist', 'cifar10', 'svhn', 'generated', 'covtype', 'a9a', 'rcv1', 'SUSY', 'cifar100', 'tinyimagenet'):
         if dataset == 'mnist':
             dl_obj = MNIST_truncated
+
+            transform_train = transforms.Compose([
+                transforms.ToTensor(),
+                AddGaussianNoise(0., noise_level, net_id, total)])
+
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                AddGaussianNoise(0., noise_level, net_id, total)])
+
+        if dataset == 'iris':
+            dl_obj = IrisCustom
 
             transform_train = transforms.Compose([
                 transforms.ToTensor(),
@@ -765,14 +815,14 @@ def get_dataloader(dataset, datadir, train_bs, test_bs, dataidxs=None, noise_lev
             transform_train = None
             transform_test = None
 
-
+    
         if dataset == "tinyimagenet":
             train_ds = dl_obj(datadir+'./train/', dataidxs=dataidxs, transform=transform_train)
             test_ds = dl_obj(datadir+'./val/', transform=transform_test)
         else:
             train_ds = dl_obj(datadir, dataidxs=dataidxs, train=True, transform=transform_train, download=True)
             test_ds = dl_obj(datadir, train=False, transform=transform_test, download=True)
-
+       
         train_dl = data.DataLoader(dataset=train_ds, batch_size=train_bs, shuffle=True, drop_last=False)
         test_dl = data.DataLoader(dataset=test_ds, batch_size=test_bs, shuffle=False, drop_last=False)
 
